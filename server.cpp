@@ -472,8 +472,22 @@ void * connection_thread(void* p_client_socket) {
           printf("error opening user directory");
         }
       } // end file modification
+      /****************************************
+      * ls - list files
+      ****************************************/
+      else if(cmd.substr(0,cmd.find(' '))=="ls"){
+          std::string ls_cmd = "ls >temps.txt";
+          system(ls_cmd.c_str());
+
+          filesize = GetFileSize("temps.txt");
+          send(clientsocket, &filesize, sizeof(&filesize), 0);
+          filehandle = open("temps.txt", O_RDONLY);
+          int bytesSent = sendfile(clientsocket, filehandle, NULL, filesize);
+
+      }
+
       else if(cmd.substr(0,cmd.find(' ')) == "get"){
-        //std::string fstr = cmd.substr(cmd.find(" ")+1);
+
         std::string fstr = cmd.substr(cmd.find(" ")+1,cmd.length());
         const char *fn = ("users/" + currentUser + "/" + fstr).c_str();
         std::cout << "fstr.c_str() " << fstr.c_str();
@@ -494,7 +508,7 @@ void * connection_thread(void* p_client_socket) {
       else if(cmd.substr(0,cmd.find(' ')) == "put"){
         int c = 0;
         char *f;
-        std::cout << "received cmdLine: " << cmd.c_str() << "\n size() of cmdLine: " << cmd.length() << "\n";
+
         std::string fstr = cmd.substr(cmd.find(" ")+1,cmd.length());
         std::cout << "fstr from: " << cmd.substr(cmd.find(" ")+1) << " to: " << cmd.length()<< "\n";
         const char *fn = ("users/" + currentUser + "/" + fstr).c_str();
@@ -508,16 +522,19 @@ void * connection_thread(void* p_client_socket) {
         if (filehandle == -1) {
           std::cout << "error opening " << fstr.c_str() << "\n";
         }
-        else std::cout << "open successfull\n";
+        else {
+          std::cout << "open successfull\n";
 
-        f = (char*)malloc(filesize);
+          f = (char*)malloc(filesize);
 
-        memset(f, 0, filesize);
-        int bytesReceived = recv(clientsocket, f, filesize, 0);
-        c = write(filehandle, f, filesize);
-        std::cout << "\nbytes written to server file: " << c << "\n";
-        close(filehandle);
-        send(clientsocket, &c, sizeof(&c), 0);
+          memset(f, 0, filesize);
+          int bytesReceived = recv(clientsocket, f, filesize, 0);
+          c = write(filehandle, f, filesize);
+          std::cout << "\nbytes written to server file: " << c << "\n";
+          close(filehandle);
+
+        //  send(clientsocket, &c, sizeof(&c), 0);
+        }
       }
       // logout
       else if(cmd.find("logout") != std::string::npos){
