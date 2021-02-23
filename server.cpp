@@ -10,9 +10,39 @@
 #include <string>
 #include <fstream>
 #include <cstring>
+#include <vector>
+#include <iostream>
+#include <sys/types.h>
+#include <unistd.h>
+#include <sys/socket.h>
+#include <netdb.h>
+#include <arpa/inet.h>
+#include <string.h>
+#include <string>
+#include <vector>
+#include <fcntl.h>
+#include <fstream>
+#include <sstream>
+#include <iterator>
+#include <stdlib.h>
+#include <sys/uio.h>
+#include <fcntl.h>
+#include <stdlib.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
+#include <ctime>
+#include <sys/sendfile.h>
 
 
 void * connection_thread(void* p_client_socket);
+
+long GetFileSize(std::string filename)
+{
+    struct stat stat_buf;
+    int rc = stat(filename.c_str(), &stat_buf);
+    return rc == 0 ? stat_buf.st_size : -1;
+}
 
 int main(int argc, char *argv[])
 {
@@ -81,6 +111,10 @@ void * connection_thread(void* p_client_socket) {
   do{
     memset(buffer, 0, 256);
 
+    // file io vars
+    int filesize = 0, filehandle = 0;
+    char filename[20];
+
 
     // wait for client input
     int n = read(clientsocket, buffer, 256);
@@ -89,9 +123,11 @@ void * connection_thread(void* p_client_socket) {
 
     std::string cmd(buffer);
 
+    printf("Command: %s\n", cmd.c_str());
+
     if(cmd.find("connect guest") != std::string::npos || isGuest == 1){
       if(isGuest == 0){
-        printf("in here\n");
+        printf("login guest\n");
         char welcome_guest[256] = "Welcome Guest User";
         send(clientsocket, welcome_guest, strlen(welcome_guest), 0);
         memset(welcome_guest, 0, 256);
@@ -166,8 +202,8 @@ void * connection_thread(void* p_client_socket) {
         }
         else{
           system(("mkdir -p users/"+create_user).c_str());
-          std::ofstream user_pub_file("users/"+create_user+"/.pub");
-          std::ofstream user_enc_file("users/"+create_user+"/.encrypt");
+          std::ofstream user_pub_file("users/"+create_user+"/txt.pub");
+          std::ofstream user_enc_file("users/"+create_user+"/txt.encrypt");
 
           char req_pub[256] = "request public key";
           send(clientsocket, req_pub, sizeof(req_pub), 0);
@@ -254,7 +290,7 @@ void * connection_thread(void* p_client_socket) {
           n = read(clientsocket,encrypted,256);
 
           // check if encrypted data = data stored in user file
-          std::ifstream user_encrypt_file("users/"+currentUser+"/.encrypt");
+          std::ifstream user_encrypt_file("users/"+currentUser+"/txt.encrypt");
           std::string line;
 
           if(user_encrypt_file.is_open()){
@@ -274,11 +310,11 @@ void * connection_thread(void* p_client_socket) {
 
                 // clear encrypted file
                 std::ofstream ofs;
-                ofs.open("users/"+currentUser+"/.encrypt", std::ofstream::out | std::ofstream::trunc);
+                ofs.open("users/"+currentUser+"/txt.encrypt", std::ofstream::out | std::ofstream::trunc);
                 ofs.close();
 
                 // add new encrypt data to file
-                std::ofstream user_new_enc_file("users/"+currentUser+"/.encrypt");
+                std::ofstream user_new_enc_file("users/"+currentUser+"/txt.encrypt");
                 user_new_enc_file << new_encrypted;
                 memset(new_encrypted, 0, 256);
 
@@ -287,6 +323,9 @@ void * connection_thread(void* p_client_socket) {
                 memset(auth_success, 0, 256);
 
                 isUser = 1;
+
+                printf("current user: \"%s\"\n", currentUser.c_str());
+
               }
               else{
                 printf("login failed\n");
@@ -308,15 +347,192 @@ void * connection_thread(void* p_client_socket) {
         }
       }
     }
-    //user is logged in
-    else if(isUser == 1){
-      if(cmd.find("logout") != std::string::npos){
+    // client is user
+    else if (isUser == 1)
+    {
+      if (cmd.substr(0, cmd.find(' ')) == "write")
+      {
+
+        printf("in here\n");
+        // THE FILENAME HAS TO BE MORE THAN 3 CHARACTERS ELSE IT IS APPENING RANDOM CHARACTERS, PLEASE SOLVE THIS ISSUE ALSO
+        std::string fstr = cmd.substr(cmd.find(" ") + 1, cmd.length());
+        const char *fn = fstr.c_str();
+        std::string fstr1 = fstr.substr(fstr.find(" ") + 1, fstr.length());
+        const char *fn1 = fstr1.c_str();
+
+        //check if file is created
+        DIR *dir;
+        struct dirent *ent;
+
+        std::string directory = "users/" + currentUser; // Since I can't check in the users file I created different dierctory to test, change it to users/
+
+        const char *currentUsername = directory.c_str();
+
+        // ALSO I CAN'T WRITE AT THE FILE DIRECTORY(NO IDEA) SO SAVE THE FILE AT THE USERS/USERNAME DIRECTORY
+
+        if ((dir = opendir(currentUsername)) != NULL)
+        {
+          while ((ent = readdir(dir)) != NULL)
+          {
+            if (strcmp(ent->d_name, fstr1.substr(fstr1.find(" ") + 1).c_str()) == 0)
+            {
+              // To write at the beginning of the file
+              if (fstr.substr(0, fstr.find(' ')) == "-f")
+              {
+                char message[256] = "Enter the text to write at the beginning of the file\n";
+                send(clientsocket, message, sizeof(message), 0);
+                memset(message, 0, 256);
+
+                memset(buffer, 0, 256);
+
+                // wait for client input
+                int n = read(clientsocket, buffer, 256);
+                if (n < 0)
+                  perror("ERROR reading from socket");
+
+                std::string textInput(buffer);
+
+                // Data can't be inserted at the start of a file on disk. We need to read the entire file into
+                // memory, insert data at the beginning, and write the entire thing back to disk.
+
+                std::fstream processedFile(("users/" + currentUser + "/" + fstr1).c_str());
+                std::stringstream fileData;
+
+                fileData << textInput;
+                fileData << " ";
+                fileData << processedFile.rdbuf();
+                processedFile.close();
+
+                processedFile.open(("users/" + currentUser + "/" + fstr1).c_str(), std::fstream::out | std::fstream::trunc);
+                processedFile << fileData.rdbuf();
+                processedFile.close();
+
+                char successful[256] = "Successful Write\n";
+                send(clientsocket, successful, sizeof(successful), 0);
+                memset(successful, 0, 256);
+              }
+              // Writing at the end of the file
+              else if (fstr.substr(0, fstr.find(' ')) == "-a")
+              {
+                char message[256] = "Enter the text to write at the end of the file\n";
+                send(clientsocket, message, sizeof(message), 0);
+                memset(message, 0, 256);
+
+                memset(buffer, 0, 256);
+
+                // wait for client input
+                int n = read(clientsocket, buffer, 256);
+                if (n < 0)
+                  perror("ERROR reading from socket");
+
+                std::string textInput(buffer);
+
+                printf("file to append to: %s\n", fstr1.c_str());
+
+                std::ofstream fileOUT("users/" + currentUser + "/" + fstr1, std::ios::app); // open file in append mode
+
+                fileOUT << textInput << std::endl; // append at the end of the file
+                fileOUT.close();                   // close the file
+
+                char successful[256] = "Successful Write\n";
+                send(clientsocket, successful, sizeof(successful), 0);
+                memset(successful, 0, 256);
+              }
+              // Removing all the data and writing again
+              else if (fstr.substr(0, fstr.find(' ')) == "-n")
+              {
+                char message[256] = "Enter the text to Over-write the file\n";
+                send(clientsocket, message, sizeof(message), 0);
+                memset(message, 0, 256);
+
+                memset(buffer, 0, 256);
+
+                // wait for client input
+                int n = read(clientsocket, buffer, 256);
+                if (n < 0)
+                  perror("ERROR reading from socket");
+
+                std::string textInput(buffer);
+
+                std::ofstream fileOUT("users/" + currentUser + "/" + fstr1, std::ios::trunc); // open file and truncate(remove) it
+
+                fileOUT << textInput << std::endl; // append the file
+                fileOUT.close();                   // close the file
+
+                char successful[256] = "Successful Write\n";
+                send(clientsocket, successful, sizeof(successful), 0);
+                memset(successful, 0, 256);
+              }
+            }
+          }
+          closedir(dir);
+        }
+        else
+        {
+          printf("error opening user directory");
+        }
+      } // end file modification
+      else if(cmd.substr(0,cmd.find(' ')) == "get"){
+        //std::string fstr = cmd.substr(cmd.find(" ")+1);
+        std::string fstr = cmd.substr(cmd.find(" ")+1,cmd.length());
+        const char *fn = ("users/" + currentUser + "/" + fstr).c_str();
+        std::cout << "fstr.c_str() " << fstr.c_str();
+        filesize = GetFileSize("users/" + currentUser + "/" + fstr);
+        std::cout << "GetFileSize returned: " << filesize <<  "\n";
+        filehandle = open(fn, O_RDONLY);
+        if (filehandle == -1) {
+          filesize = 0; // send zero if file not opened
+          std::cout << "open failed to open file: " << fstr.c_str();
+        }
+        else {
+          send(clientsocket, &filesize, sizeof(&filesize), 0); // send filesize
+          sendfile(clientsocket, filehandle, NULL, filesize);
+          std::cout << " sentfile: \n";
+        }
+
+      } // end get
+      else if(cmd.substr(0,cmd.find(' ')) == "put"){
+        int c = 0;
+        char *f;
+        std::cout << "received cmdLine: " << cmd.c_str() << "\n size() of cmdLine: " << cmd.length() << "\n";
+        std::string fstr = cmd.substr(cmd.find(" ")+1,cmd.length());
+        std::cout << "fstr from: " << cmd.substr(cmd.find(" ")+1) << " to: " << cmd.length()<< "\n";
+        const char *fn = ("users/" + currentUser + "/" + fstr).c_str();
+
+        memset(&filesize, 0, sizeof(&filesize));
+        recv(clientsocket, &filesize, sizeof(&filesize), 0); // get filesize from client
+
+        std::cout << "filesize received: " << filesize << "\n";
+
+        filehandle = open(fn, O_CREAT | O_EXCL | O_WRONLY, 0666);
+        if (filehandle == -1) {
+          std::cout << "error opening " << fstr.c_str() << "\n";
+        }
+        else std::cout << "open successfull\n";
+
+        f = (char*)malloc(filesize);
+
+        memset(f, 0, filesize);
+        int bytesReceived = recv(clientsocket, f, filesize, 0);
+        c = write(filehandle, f, filesize);
+        std::cout << "\nbytes written to server file: " << c << "\n";
+        close(filehandle);
+        send(clientsocket, &c, sizeof(&c), 0);
+      }
+      // logout
+      else if(cmd.find("logout") != std::string::npos){
         char bye[256] = "Goodbye\n";
         send(clientsocket, bye, sizeof(bye), 0);
         memset(bye, 0, 256);
         logout = 1;
-      }
-    }
+      } // end logout
+      else{
+        char invalid_cmd[256] = "Invalid command. Try again.";
+        printf("invalid command\n");
+        send(clientsocket, invalid_cmd, sizeof(invalid_cmd), 0);
+        memset(invalid_cmd, 0, 256);
+      } // end invalid command
+    } // end user
     // logout rando user
     else if(cmd.find("logout") != std::string::npos){
       char bye[256] = "Goodbye\n";
