@@ -103,7 +103,7 @@ int main()
     }
 
     //	Create a hint structure for the server we're connecting with
-    int port = 1000, filesize, filehandle, status;
+    int port = 1003, filesize, filehandle, status;
     char filename[20], *myfile;
     string ipAddress = "127.0.0.1";
 
@@ -199,7 +199,7 @@ int main()
 
                                 else if(strcmp(serverResponse.c_str(),"request public key")==0){
                                     //cout << "yessss!\r\n";
-                                    cout << "SERVERR> " << serverResponse << "\r\n";
+                                    cout << "SERVER> " << serverResponse << "\r\n";
                                     system(("mkdir -p usersClient/"+s).c_str());
                                     encryption(encryptedText,privateKey,publicKey);
 
@@ -406,91 +406,137 @@ int main()
             }
              i++;
                }
-              /****************************************
-              * ls - list files
-              ****************************************/
-             } else if(userInput.substr(0,userInput.find(' '))=="ls"){
-                  std::vector<std::string> tokens=f(userInput);
-                  std::string fstr = "ls";
-                  const char *fn = fstr.c_str();
+               /****************************************
+               * ls - list files
+               ****************************************/
+              } else if(userInput.substr(0,userInput.find(' '))=="ls"){
+                   std::vector<std::string> tokens=f(userInput);
+                   std::string fstr = "ls";
+                   const char *fn = fstr.c_str();
 
-                  int sendRes = send(sock, userInput.c_str(), userInput.size(), 0);
+                   int sendRes = send(sock, userInput.c_str(), userInput.size(), 0);
 
-                  if (sendRes == -1){
-                    cout << "Could not send input to server! Whoops!\r\n";
-                    break;
-                  } else {
-                    //  memset(&filesize, 0, sizeof(&filesize));
-                    int bytesReceived = recv(sock, &filesize, sizeof(&filesize), 0);
-                    if (bytesReceived == -1){
-                      cout << "There was an error getting response from server\r\n";
-                    }
-                    else {
+                   if (sendRes == -1){
+                     cout << "Could not send input to server! Whoops!\r\n";
+                     break;
+                   } else {
+                     //  memset(&filesize, 0, sizeof(&filesize));
+                     int bytesReceived = recv(sock, &filesize, sizeof(&filesize), 0);
+                     if (bytesReceived == -1){
+                       cout << "There was an error getting response from server\r\n";
+                     }
+                     else {
 
-                      myfile = (char *)malloc(filesize);
-                      memset(myfile, 0, filesize);
-                      bytesReceived = recv(sock, myfile, filesize, 0);
+                       myfile = (char *)malloc(filesize);
+                       memset(myfile, 0, filesize);
+                       bytesReceived = recv(sock, myfile, filesize, 0);
 
-                      if (bytesReceived == -1){
-                        cout << "There was an error receiving ls from server\r\n";
-                      } else {
-                        filehandle = creat("temps.txt", O_WRONLY);
-                        int bytesWritten =  write(filehandle, myfile, filesize);
-              
-                        close(filehandle);
-                        cout << "Directory listing: \n";
-                        //  system("cat temp.txt");
-                        std::string cat_temps_cmd = "cat temps.txt";
-                        system(cat_temps_cmd.c_str());
+                       if (bytesReceived == -1){
+                         cout << "There was an error receiving ls from server\r\n";
+                       } else {
+                         filehandle = creat("temps.txt", O_WRONLY);
+                         int bytesWritten =  write(filehandle, myfile, filesize);
 
-                      }
+                         close(filehandle);
+                         cout << "Directory listing: \n";
+                         //  system("cat temp.txt");
+                         std::string cat_temps_cmd = "cat temps.txt";
+                         system(cat_temps_cmd.c_str());
 
-                    }
-                  }
-                }
+                       }
+
+                     }
+                   }
+                 }
 
 
+else if(userInput.substr(0,userInput.find(' '))=="receive"){
+ int c = 0;
+ char *f;
 
+
+ std::string fstr = userInput.substr(userInput.find(" ")+1);
+ const char *fn = fstr.c_str();
+ int sendRes = send(sock, userInput.c_str(), userInput.size(), 0);
+ cout << "sent userInput to server: " << userInput.c_str() << "\n size() of cmdLine: " << userInput.size() << "\n";
+       if (sendRes == -1){
+             cout << "Could not send get request server! Whoops!\r\n";
+             break;
+       } else {
+           memset(&filesize, 0, sizeof(&filesize));
+           int bytesReceived = recv(sock, &filesize, sizeof(&filesize), 0);
+           if (bytesReceived == -1){
+                   cout << "No such file found; filesize: " << filesize << "\r\n";
+           } else {
+               cout << "received filesize: " << filesize << "about to open: " << filename << "\n";
+               filehandle = creat(fn, 0777);
+               if (filehandle == -1) {
+                     cout << "Cannot create file here\n";
+                     break;
+               }
+               char contents[filesize];
+               int w;
+               int rec;
+               int cc = 0;
+               while(cc != filesize) {
+                 rec=recv(sock,contents,sizeof(contents),0);
+                 if(rec<0){
+                   cout <<"Error receiving file\n";
+                   break;
+                 }
+                 cc+=1;
+                 w=write(filehandle, contents, rec);
+               }
+             cout << "here before close\n";
+             close(filehandle);
+             send(sock, &w, sizeof(&w), 0);
+
+           }
+       } // else good send
+} // end receive
+
+  /*
       else if(userInput.substr(0,userInput.find(' '))=="get"){
             std::vector<std::string> tokens=f(userInput);
 
             int c = 0;
             char *f;
             std::string fstr = userInput.substr(userInput.find(" ")+1,userInput.length());
-            std::cout << "fstr from: " << userInput.substr(userInput.find(" ")+1) << " to: " << userInput.length()<< "\n";
+            cout << "fstr from: " << userInput.substr(userInput.find(" ")+1) << " to: " << userInput.length()<< "\n";
             const char *fn = fstr.c_str();
 
             int sendRes = send(sock, userInput.c_str(), userInput.size(), 0);
                   if (sendRes == -1){
-                        std::cout << "Could not send get request server! Whoops!\r\n";
+                        cout << "Could not send get request server! Whoops!\r\n";
                         break;
                   } else {
                       memset(&filesize, 0, sizeof(&filesize));
                       int bytesReceived = recv(sock, &filesize, sizeof(&filesize), 0);
                       if (bytesReceived == -1){
-                              std::cout << "No such file found; filesize: " << filesize << "\r\n";
+                              cout << "No such file found; filesize: " << filesize << "\r\n";
                       } else {
                           cout << "received filesize: " << filesize << "about to open: " << filename << "\n";
                           filehandle = open(fn, O_CREAT | O_EXCL | O_WRONLY, 0666);
                           if (filehandle == -1) {
-                                std::cout << "FILE already exists HERE ???";
+                                cout << "FILE already exists HERE ???";
                         }
 
                         myfile = (char *)malloc(filesize);
                         memset(myfile, 0, filesize);
 
                         int bytesReceived = recv(sock, myfile, filesize, 0);
-                        std::cout << "bytesReceived: " << bytesReceived << "\n";
+                        cout << "bytesReceived: " << bytesReceived << "\n";
 
                         int bytesWritten =  write(filehandle, myfile, filesize);
-                        std::cout << "bytesWritten: " << bytesWritten << "\n";
+                        cout << "bytesWritten: " << bytesWritten << "\n";
                         close(filehandle);
                       }
                   } // else good send
           }
-          else if(userInput.substr(0,userInput.find(' '))=="put"){
+  */
+          else if(userInput.substr(0,userInput.find(' '))=="send"){
 
-		                std::string fstr = userInput.substr(userInput.find(" ")+1);
+		            std::string fstr = userInput.substr(userInput.find(" ")+1);
                     const char *fn = fstr.c_str();
                     cout << "fstr.c_str() " << fstr.c_str() << "\n";
                     int sendRes = send(sock, userInput.c_str(), userInput.size(), 0);
@@ -500,34 +546,116 @@ int main()
                          cout << "Could not send to server! Whoops!\r\n";
 
                     } else {
+                            FILE * pFile;
+                            long lSize;
+                            char * buffer;
+                            size_t result;
 
-                            filehandle = open(fn, O_RDONLY, 0444);
+                            pFile = fopen(fn, "rb");
+                            if (pFile==NULL) {fputs ("File error!!! ",stderr); break;}
+
+                            // obtain file size:
+                            fseek (pFile , 0 , SEEK_END);
+                            lSize = ftell (pFile);
+                            rewind (pFile);
+                            long filesize = lSize;
+                            cout << "GetFileSize returned: " << filesize <<  "szof:" << sizeof(&filesize)<<"\n";
+                            sendRes = send(sock, &filesize, sizeof(&filesize), 0);
+
+
+
+                            // allocate memory to contain the whole file:
+                            buffer = (char*) malloc (sizeof(char)*lSize);
+                            if (buffer == NULL) {fputs ("Memory error",stderr);}
+
+                            // copy the file into the buffer:
+                            result = fread (buffer,1,lSize,pFile);
+                            if (result != lSize) {fputs ("Reading error",stderr);}
+
+
+                            //send(sock, buffer, lSize, 0);
+                            char buf[1]={' '};
+                            int from;
+                            from=open(fn,O_RDONLY);
+                            if(from<0){
+	                           cout<<"Error opening file\n";
+                               return 0;
+                            }
+                            int n=1;
+                            int s;
+
+                            while((n=read(from,buf,sizeof(buf)))!=0){
+                            s=send(sock,buf,sizeof(buf),0);
+                            //s=write(clientsocket,buf,n);
+                            if(s<0){cout<<"error sending\n";return 0;}
+                             }
+
+
+                             recv(sock, &status, sizeof(int), 0);
+                             cout << "status returned: " << status <<  "/n";
+                              if (status){
+                                cout << "File sent successfully\r\n";
+                              } else {
+                                cout << "File sent NOT successful\r\n";
+
+                              }
+                            /* the whole file is now loaded in the memory buffer. */
+
+                            // terminate
+                            fclose (pFile);
+                            free (buffer);
+
+
+                            //filehandle = open(fn, O_RDONLY, 0444);
+                            //struct stat file_stat;
+                            //filehandle = open(fn, O_RDONLY);
+
+                            /* Get file stats */
+                            /*
+                            if (fstat(filehandle, &file_stat) < 0){
+                                fprintf(stderr, "Error fstat --> %s", strerror(errno));
+                                exit(EXIT_FAILURE);
+                            }
+
                             if (filehandle == -1)
                               cout << "No such file  on the local directory\n\n";
                               // send filesize to server
-                            else {
-                              cout << "open file successful\n";
-                              filesize = GetFileSize(fstr);
-                              cout << "GetFileSize returned: " << filesize <<  "szof:" << sizeof(&filesize)<<"\n";
-                              sendRes = send(sock, &filesize, sizeof(&filesize), 0);
-                              cout << "sendRes 1: " << sendRes << "\n";
-                              sendRes = sendfile(sock, filehandle, NULL, filesize);
-
-                              if (sendRes == -1){
-                                cout << "sendFile 2: Could not send file!\r\n";
-
-                              } else {
-                                cout << "sendFile 3: SENT file!--sendRes = " << sendRes << "\r\n";
-                                //  memset(&filesize, 0, 4096);
-                            /*    recv(sock, &status, sizeof(int), 0);
-                                if (status){
-                                cout << "File sent successfully\r\n";
-                                } else {
-                                  cout << "File sent NOT successful\r\n";
+                            else cout << "open file successful\n";
+                            filesize = GetFileSize(fstr);
+                            cout << "GetFileSize returned: " << filesize <<  "szof:" << sizeof(&filesize)<<"\n";
+                            //sendRes = send(sock, &filesize, sizeof(&filesize), 0);
+                            //cout << "sendRes 1: " << sendRes << "\n";
+                            //sendRes = sendfile(sock, filehandle, NULL, filesize);
+                            char * buffer;
+                            // allocate memory to contain the whole file:
+                            buffer = (char*) malloc (sizeof(char)*filesize);
+                            FILE *fd = fopen(fn, "rb");
+                            size_t rret, wret;
+                            int bytes_read;
+                            while (!feof(fd)) {
+                                if ((bytes_read = fread(&buffer, 1, filesize, fd)) > 0)
+                                   send(sock, buffer, bytes_read, 0);
+                                else
+                                    break;
                                 }
-                              */
+                            fclose(fd);
+
+                            */
+
+                            /*if (sendRes == -1){
+                              cout << "sendFile 2: Could not send file!\r\n";
+
+                            } else {
+                                cout << "sendFile 3: SENT file!--sendRes = " << sendRes << "\r\n";
+                                memset(&filesize, 0, 4096);
+                              recv(sock, &status, sizeof(int), 0);
+                              if (status){
+                                cout << "File sent successfully\r\n";
+                              } else {
+                                cout << "File sent NOT successful\r\n";
+
                               }
-                            }
+                            } */
                       }
                   }
         else if(userInput.substr(0,userInput.find(' '))=="quit"){
