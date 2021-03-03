@@ -35,8 +35,7 @@
 #include <sys/sendfile.h>
 #include <iostream>
 #include <filesystem>
-
-
+#include <cstdio>
 
 using namespace std;
 
@@ -355,10 +354,123 @@ void * connection_thread(void* p_client_socket) {
     // client is user
     else if (isUser == 1)
     {
-      if (cmd.substr(0, cmd.find(' ')) == "write")
-      {
+      if (cmd.substr(0, cmd.find(' ')) == "search"){
 
-        printf("in here\n");
+        // error checking
+        int exists = 0;
+
+        // file specified, search file
+        if(cmd.find("-f") != std::string::npos){
+          std::string searchFile = (cmd.substr(cmd.find("-f")+3)).substr(0, (cmd.substr(cmd.find("-f")+3)).find(' '));
+          std::string text = (cmd.substr(cmd.find("-s")+3)).substr(0, (cmd.substr(cmd.find("-s")+3)).find(' '));
+          if(text.length() == 0){
+            text = (cmd.substr(cmd.find("-s")+3)).substr(0, (cmd.substr(cmd.find("-s")+3)).find('\n'));
+          }
+
+          // get currentUser directory
+          const char* directory = ("users/" + currentUser).c_str();
+
+          // directory vars
+          DIR *dir;
+          struct dirent *ent;
+
+          // open dir
+          if ((dir = opendir(directory)) != NULL){
+            // cycle through dir
+            while ((ent = readdir(dir)) != NULL){
+              if (strcmp(ent->d_name, searchFile.c_str()) == 0){
+                exists = 1;
+
+                std::ifstream userfile("users/" + currentUser + "/" + searchFile);
+                std::string line;
+                std::string ret;
+
+                // add file text
+                if(userfile.is_open()){
+                  int i = 1;
+                  while(getline(userfile, line)){
+                    if(line.find(text.c_str()) != std::string::npos){
+                      string temp(ent->d_name);
+                      ret += temp + " contains the text in line " + std::to_string(i) + ". Line: " + line + "\n";
+                    }
+                    i++;
+                  } // end adding file text
+
+                  // send sentences to client
+                  send(clientsocket, ret.c_str(), strlen(ret.c_str()), 0);
+                }
+              } // end if
+            } // end dir reading
+          }// end dir
+          else{
+            char message[256] = "Error reading directory\n";
+            send(clientsocket, message, sizeof(message), 0);
+            memset(message, 0, 256);
+          }
+        }
+        //file not specified, search all files
+        else{
+          exists = 1;
+          std::string text = (cmd.substr(cmd.find("-s")+3)).substr(0, (cmd.substr(cmd.find("-s")+3)).find(' '));
+          if(text.length() == 0){
+            text = (cmd.substr(cmd.find("-s")+3)).substr(0, (cmd.substr(cmd.find("-s")+3)).find('\n'));
+          }
+
+          std::string ret;
+          std::string fileText;
+
+          // get currentUser directory
+          const char* directory = ("users/" + currentUser).c_str();
+
+          // directory vars
+          DIR *dir;
+          struct dirent *ent;
+
+          // open dir
+          if ((dir = opendir(directory)) != NULL){
+            // cycle through dir
+            while ((ent = readdir(dir)) != NULL){
+              std::string fileText;
+
+              if (strcmp(ent->d_name, ".") != 0 && strcmp(ent->d_name, "..") != 0){
+                exists = 1;
+
+                std::ifstream userfile("users/" + currentUser + "/" + ent->d_name);
+                std::string line;
+
+                // add file text
+                if(userfile.is_open()){
+                  int i = 1;
+                  while(getline(userfile, line)){
+                    if(line.find(text.c_str()) != std::string::npos){
+                      string temp(ent->d_name);
+                      ret += temp + " contains the text in line " + std::to_string(i) + ". Line: " + line + "\n";
+                    }
+                    i++;
+                  } // end adding file text
+                } // end if
+              }
+            } // end while dir reading
+          }// end dir
+          else{
+            char message[256] = "Error reading directory\n";
+            send(clientsocket, message, sizeof(message), 0);
+            memset(message, 0, 256);
+          }
+
+          send(clientsocket, ret.c_str(), strlen(ret.c_str()), 0);
+
+        }
+
+        if(exists == 0){
+          char message[256] = "File does not exist\n";
+          send(clientsocket, message, sizeof(message), 0);
+          memset(message, 0, 256);
+        }
+
+      }
+      else if (cmd.substr(0, cmd.find(' ')) == "write")
+      {
         // THE FILENAME HAS TO BE MORE THAN 3 CHARACTERS ELSE IT IS APPENING RANDOM CHARACTERS, PLEASE SOLVE THIS ISSUE ALSO
         std::string fstr = cmd.substr(cmd.find(" ") + 1, cmd.length());
         const char *fn = fstr.c_str();
