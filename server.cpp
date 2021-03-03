@@ -118,8 +118,7 @@ void * connection_thread(void* p_client_socket) {
     // file io vars
     int filesize = 0, filehandle = 0;
     char filename[20];
-
-
+cout << "waiting for client cmd\n";
     // wait for client input
     int n = read(clientsocket, buffer, 256);
     if (n < 0)
@@ -239,19 +238,19 @@ void * connection_thread(void* p_client_socket) {
           isGuest = 0;
           }
         }
-      // logout guest user
-      else if(strcmp(buffer, "logout") == 0){
-        char bye[256] = "Goodbye\n";
-        send(clientsocket, bye, sizeof(bye), 0);
-        logout = 1;
-      }
-      //invalid guest user command
-      else{
-        char invalid_cmd[256] = "Invalid command. Try again.";
-        printf("invalid command\n");
-        send(clientsocket, invalid_cmd, sizeof(invalid_cmd), 0);
-        memset(invalid_cmd, 0, 256);
-      }
+        // logout guest user
+        else if(strcmp(buffer, "logout") == 0){
+          char bye[256] = "Goodbye\n";
+          send(clientsocket, bye, sizeof(bye), 0);
+          logout = 1;
+        }
+        //invalid guest user command
+        else{
+          char invalid_cmd[256] = "Invalid command. Try again.";
+          printf("invalid command\n");
+          send(clientsocket, invalid_cmd, sizeof(invalid_cmd), 0);
+          memset(invalid_cmd, 0, 256);
+        }
     }
     //login process
     else if(cmd.find("login") != std::string::npos){
@@ -271,10 +270,10 @@ void * connection_thread(void* p_client_socket) {
               }
             }
             closedir(dir);
-          }
-          else{
+        }
+        else{
             printf("error opening user directory");
-          }
+        }
 
         //user is not created, error
         if(created == 0){
@@ -600,6 +599,8 @@ void * connection_thread(void* p_client_socket) {
           send(clientsocket, &filesize, sizeof(&filesize), 0);
           filehandle = open("temps.txt", O_RDONLY);
           int bytesSent = sendfile(clientsocket, filehandle, NULL, filesize);
+    ls_cmd = "rm temps.txt";
+    system(ls_cmd.c_str());
 
       }
 
@@ -616,70 +617,46 @@ void * connection_thread(void* p_client_socket) {
         char * buffer;
         size_t result;
         pFile = fopen(fn, "rw");
-        if (pFile == NULL) {fputs("File error!!! ", stderr);break;}
-        // obtain file size:
-        fseek (pFile, 0, SEEK_END);
-        lSize = ftell (pFile);
-        rewind (pFile);
-        long filesize = lSize;
-        cout << "filesize: " << filesize << "\n";
-        int sendRes = send(clientsocket, &filesize, sizeof(&filesize), 0);
-
-        // allocate memory to contain the whole file:
-        buffer = (char*) malloc (sizeof(char)*lSize);
-        if (buffer == NULL) {fputs ("Memory error", stderr);}
-
-        // copy the file into the buffer:
-        result = fread (buffer, 1, lSize, pFile);
-        if (result != lSize) {fputs ("Reading error", stderr);}
-
-        char buf[1]={' '};
-        int from;
-        from=open(fn,O_RDONLY);
-        if(from<0){
-          cout << "Error opening file\n";
-          return 0;
-        }
-        int n=1;
-        int s;
-
-        while ((n=read(from, buf, sizeof(buf)))!=0) {
-          s=send(clientsocket,buf,sizeof(buf),0);
-          if(s<0) {cout << "error sending\n"; return 0;}
-        }
-        recv(clientsocket, &status, sizeof(int), 0);
-        cout << "status returned: " << status << "\n";
-        if (status) {
-          cout << "File sent successfully\r\n";
+        if (pFile == NULL) {
+          fputs("File error!!! ", stderr);
         } else {
-          cout << "File send NOT successful\r\n";
+          // obtain file size:
+          fseek (pFile, 0, SEEK_END);
+          lSize = ftell (pFile);
+          rewind (pFile);
+          long filesize = lSize;
+          cout << "filesize: " << filesize << "\n";
+          int sendRes = send(clientsocket, &filesize, sizeof(&filesize), 0);
+
+          // allocate memory to contain the whole file:
+          buffer = (char*) malloc (sizeof(char)*lSize);
+          if (buffer == NULL) {fputs ("Memory error", stderr);}
+
+          // copy the file into the buffer:
+          result = fread (buffer, 1, lSize, pFile);
+          if (result != lSize) {fputs ("Reading error", stderr);}
+
+          char buf[1]={' '};
+          int from;
+          from=open(fn,O_RDONLY);
+          if(from<0){
+            cout << "Error opening file\n";
+            return 0;
+          }
+          int n=1;
+          int s;
+
+          while ((n=read(from, buf, sizeof(buf)))!=0) {
+            s=send(clientsocket,buf,sizeof(buf),0);
+            if(s<0) {cout << "error sending\n";}
+          }
+          // terminate
+          fclose (pFile);
+          free (buffer);
         }
-        // terminate
-        fclose (pFile);
-        free (buffer);
 
       }
-/*
-      else if(cmd.substr(0,cmd.find(' ')) == "get"){
-        //std::string fstr = cmd.substr(cmd.find(" ")+1);
-        std::string fstr = cmd.substr(cmd.find(" ")+1,cmd.length());
-        const char *fn = ("users/" + currentUser + "/" + fstr).c_str();
-        std::cout << "fstr.c_str() " << fstr.c_str();
-        filesize = GetFileSize("users/" + currentUser + "/" + fstr);
-        std::cout << "GetFileSize returned: " << filesize <<  "\n";
-        filehandle = open(fn, O_RDONLY);
-        if (filehandle == -1) {
-          filesize = 0; // send zero if file not opened
-          std::cout << "open failed to open file: " << fstr.c_str();
-        }
-        else {
-          send(clientsocket, &filesize, sizeof(&filesize), 0); // send filesize
-          sendfile(clientsocket, filehandle, NULL, filesize);
-          std::cout << " sentfile: \n";
-        }
 
-      } // end get
-      */
       else if(cmd.substr(0,cmd.find(' ')) == "send"){
         int c = 0;
         char *f;
@@ -687,150 +664,43 @@ void * connection_thread(void* p_client_socket) {
         std::string fstr = cmd.substr(cmd.find(" ")+1,cmd.length());
         std::cout << "fstr from: " << cmd.substr(cmd.find(" ")+1) << " to: " << cmd.length()<< "\n";
         const char* fn = ("users/" + currentUser + "/" + fstr).c_str();
-        //std::cout << "path of the file to be created: " <<fn<< "\n";
-        //std::string fn2 = ("users/" + currentUser + "/" + fstr);
-        //FILE* fn2;
-         //recv(clientsocket, fstr, fstr.length(), 0); // get size of the filename
-         //std::cout << "filename's length received: " << fstr << "\n";
-         memset(&filesize, 0, sizeof(&filesize));
-         recv(clientsocket, &filesize, sizeof(&filesize), 0); // get the size of the file in bytes
+
+        memset(&filesize, 0, sizeof(&filesize));
+        recv(clientsocket, &filesize, sizeof(&filesize), 0); // get the size of the file in bytes
 
         std::cout << "filesize received: " << filesize << "\n";
-
-        /*
-        size_t datasize;
-        FILE* filee = fopen(fn, "wb");
-        f = (char*)malloc(filesize);
-        memset(f, 0, filesize);
-
-        for(int i = 0; i < filesize; i++)
-        {
-            datasize = recv(clientsocket, f, sizeof(f), 0);
-            fwrite(&f, 1, datasize, filee);
-        }
-        fclose(filee);
-         */
-         //std::fstream user_file;
-
-        //user_file.open("users/" + currentUser + "/" + fstr, ios::out | ios::trunc | ios::binary);
-        //if(user_file.is_open()){
-                //cout<<"[LOG] : File Creted.\n";
-            //}
-        //std::ofstream user_file("users/" + currentUser + "/" + fstr);
-
-
-
-        //filehandle = open(fn, O_CREAT | O_EXCL | O_WRONLY, 0666);
-        //if (filehandle == -1) {
-          //std::cout << "error creating the file " << fstr.c_str() << "\n";
-        //}
-        //else std::cout << "open successfull\n";\\
-
-
-
 
         std::string input_trace_filename = string(("users/" + currentUser + "/" + fstr));
         int index = input_trace_filename.find_last_of("/\\");
         std::string filename2 = input_trace_filename.substr(index+1);
-        std::cout << "filename only: " << filename2 << std::endl;
-
-
 
         int user_file=creat(string("users/" + currentUser + "/" + filename2).c_str(),0777);
 
-
         if(user_file<0){
           cout<<"Error creating destination file\n";
-           break;
-        }
+        } else {
 
-        char contents[filesize];
-        //n = read(clientsocket,contents,filesize);
-        //cout<<"[LOG] : File Created.\n";
-        int w;
-        int rec;
-        int cc=0;
-        while(cc!=filesize){
-          rec=recv(clientsocket,contents,sizeof(contents),0);
-          if(rec<0){
-            cout<<"Error receiving\n";
-            break;
-          }
-            cc+=1;
+          char contents[filesize];
+          //n = read(clientsocket,contents,filesize);
+          //cout<<"[LOG] : File Created.\n";
+          int w;
+          int rec;
+          int cc=0;
+          while(cc!=filesize){
+            rec=recv(clientsocket,contents,sizeof(contents),0);
+            if(rec<0){
+              cout<<"Error receiving\n";
+              break;
+            }
+            cc += rec;
+  //          cc+=1;
+
             w=write(user_file,contents,rec);
 
-
           }
-
-
-        cout<<"here before close\n";
-        close(user_file);
-        send(clientsocket, &w, sizeof(&w), 0);
-        //std::cout << "bytes written to server file: " << contents<< "\n";
-        //user_file << contents;
-
-
-
-
-
-
-
-
-
-        //f = (char*)malloc(filesize);
-        //memset(f, 0, filesize);
-        //int bytesReceived = recv(clientsocket, f, filesize, 0);
-        //c = write(filehandle, f, filesize);
-        //std::cout << "\nbytes written to server file: " << c << "\n";
-        //close(filehandle);
-        //send(clientsocket, &c, sizeof(&c), 0);
-
-
-       //size_t datasize;
-      // FILE* fd = fopen(fn, "wb");
-
-       //if (fd==NULL) {fputs ("File error!!! ",stderr);}
-
-       //char* text = ("users/" + currentUser + "/");
-       //char* text;
-       //for(int i = 0; i < filesize; i++)
-       //{
-       //datasize = recv(clientsocket, text, sizeof(text), 0);
-       //fwrite(&text, sizeof(char), datasize, fd);
-       //}
-      //fclose(fd);
-
-
-
-
-
-        //dosyayi burada al
-        //FILE* filee = fopen(fn, "w");
-
-        //size_t datasize  = recv(clientsocket, f, filesize, 0);
-
-        //fwrite(&f,1, datasize,filee);
-        //std::cout << "\nbytes written to server file: " << c << "\n";
-        //close(filehandle);
-        //send(clientsocket, &c, sizeof(&c), 0);
-
-        //filehandle = open(fn, O_CREAT | O_EXCL | O_WRONLY, 0666);
-        //std::string filename ="users/" + currentUser + "/" + fstr;
-        //filehandle = fopen("ahmet", "w");
-
-        //system(("mkdir -p usersClient/"+s).c_str());
-        //std::ofstream user_pub_file("usersClient/"+s+"/key.pub");
-
-
-        //if (filehandle == -1) {
-          //std::cout << "error opening " << fstr.c_str() << "\n";
-          //break;
-        //}
-        //else std::cout << "open successfull\n";
-
-
-
-
+          close(user_file);
+//          send(clientsocket, &w, sizeof(&w), 0);
+        }
       }
       // logout
       else if(cmd.find("logout") != std::string::npos){
