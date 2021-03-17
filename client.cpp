@@ -103,7 +103,7 @@ int main()
     }
 
     //	Create a hint structure for the server we're connecting with
-    int port = 1003, filesize, filehandle, status;
+    int port = 1004, filesize, filehandle, status;
     char filename[20], *myfile;
     string ipAddress = "127.0.0.1";
 
@@ -404,7 +404,7 @@ int main()
                /****************************************
                * ls - list files
                ****************************************/
-              } else if(userInput.substr(0,userInput.find(' '))=="ls"){
+             } else if(userInput.substr(0,userInput.find(' '))=="ls"){
                    std::vector<std::string> tokens=f(userInput);
                    std::string fstr = "ls";
                    const char *fn = fstr.c_str();
@@ -429,7 +429,7 @@ int main()
                        if (bytesReceived == -1){
                          cout << "There was an error receiving ls from server\r\n";
                        } else {
-                         filehandle = creat("temps.txt", O_WRONLY);
+                         filehandle = creat("temps.txt", O_RDONLY);
                          int bytesWritten =  write(filehandle, myfile, filesize);
 
                          close(filehandle);
@@ -437,8 +437,9 @@ int main()
                          //  system("cat temp.txt");
                          std::string cat_temps_cmd = "cat temps.txt";
                          system(cat_temps_cmd.c_str());
-                         cat_temps_cmd = "rm temps.txt";
-                         system(cat_temps_cmd.c_str());
+// DS try removing the remove of the temp file so no error.
+                      //   cat_temps_cmd = "rm temps.txt";
+                      //   system(cat_temps_cmd.c_str());
 
                        }
 
@@ -542,10 +543,12 @@ int main()
                             }
                             int n=1;
                             int s;
-
+                            //s=send(sock,buf,sizeof(buf),0);
                             while((n=read(from,buf,sizeof(buf)))!=0){
+
                               s=send(sock,buf,sizeof(buf),0);
-                              //s=write(clientsocket,buf,n);
+
+                              //s=write(sock,buf,n);
                               if(s<0){cout<<"error sending\n";return 0;}
                              }
 
@@ -560,13 +563,9 @@ int main()
                   else if(userInput.substr(0,userInput.find(' '))=="quit"){
                     break; // exit while
                   }
-
-
-
-
 // DS - don't know about the rest of this
 
-        else{
+        else{ // not one of the above commands
         //	Send to server
         int sendRes = send(sock, userInput.c_str(), userInput.size() + 1, 0);
         if (sendRes == -1)
@@ -590,7 +589,14 @@ int main()
 
               }
             else{
-               cout << "SERVER> " << serverResponse << "\r\n";
+
+              cout << "SERVER> " << serverResponse << "\r\n";
+
+               if(strcmp(serverResponse.c_str(),"Goodbye\n")==0){                                                cout << "SERVERR> " << serverResponse << "\r\n";
+                    break;
+
+              }
+
             }
         }
       }
