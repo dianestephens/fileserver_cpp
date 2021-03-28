@@ -54,7 +54,7 @@ int main(int argc, char *argv[])
   // clear address structure
   bzero((char *) &serv_addr, sizeof(serv_addr));
 
-  port = 1004; // hard code port #
+  port = 1005; // hard code port #
   // setup the host_addr structure
   serv_addr.sin_family = AF_INET;
   serv_addr.sin_addr.s_addr = INADDR_ANY;
@@ -102,6 +102,7 @@ void * connection_thread(void* p_client_socket) {
   send(clientsocket, welcome, sizeof(welcome), 0);
 
   // big while loop
+  //
   do{
     memset(buffer, 0, 256);
 
@@ -363,7 +364,7 @@ void * connection_thread(void* p_client_socket) {
           system(ls_cmd.c_str());
 
           filesize = GetFileSize("temps.txt");
-          send(clientsocket, &filesize, sizeof(&filesize), 0);
+          send(clientsocket, &filesize, sizeof(int), 0);
           filehandle = open("temps.txt", O_RDONLY);
           int bytesSent = sendfile(clientsocket, filehandle, NULL, filesize);
   // DS remove this - causing errors
@@ -395,7 +396,7 @@ void * connection_thread(void* p_client_socket) {
           rewind (pFile);
           long filesize = lSize;
           cout << "filesize: " << filesize << "\n";
-          int sendRes = send(clientsocket, &filesize, sizeof(&filesize), 0);
+          int sendRes = send(clientsocket, &filesize, sizeof(int), 0);
 
           // allocate memory to contain the whole file:
           buffer = (char*) malloc (sizeof(char)*lSize);
@@ -436,8 +437,8 @@ void * connection_thread(void* p_client_socket) {
         std::cout << "fstr from: " << cmd.substr(cmd.find(" ")+1) << " to: " << cmd.length()<< "\n";
         const char* fn = ("users/" + currentUser + "/" + fstr).c_str();
 
-        memset(&filesize, 0, sizeof(&filesize));
-        recv(clientsocket, &filesize, sizeof(&filesize), 0); // get the size of the file in bytes
+        //memset(&filesize, 0, sizeof(&filesize));
+        recv(clientsocket, &filesize, sizeof(int), 0); // get the size of the file in bytes
 
         std::cout << "filesize received: " << filesize << "\n";
 
@@ -893,7 +894,6 @@ void * connection_thread(void* p_client_socket) {
       break;
     }
   }
-
   if(!name_found){
     if (fs::create_directory("users/" + client_name) == 0)
       printf("ERROR creating user directory");

@@ -62,6 +62,7 @@ void encryption(char* encryptedText,int& privateKey,int& publicKey)
   //cout << "Encrypted time> " << encryptedText<< "\r\n";
   //cout << "decrypted time> " << decryptedText<< "\r\n";
   //cout << "SERVER> " << publicKey<< "\r\n";
+  //
 }
 
 void encryptedTextt(char* encryptedText,int privateKey,int publicKey)
@@ -103,7 +104,7 @@ int main()
     }
 
     //	Create a hint structure for the server we're connecting with
-    int port = 1004, filesize, filehandle, status;
+    int port = 1005, filesize, filehandle, status;
     char filename[20], *myfile;
     string ipAddress = "127.0.0.1";
 
@@ -416,7 +417,7 @@ int main()
                      break;
                    } else {
                      //  memset(&filesize, 0, sizeof(&filesize));
-                     int bytesReceived = recv(sock, &filesize, sizeof(&filesize), 0);
+                     int bytesReceived = recv(sock, &filesize, sizeof(int), 0);
                      if (bytesReceived == -1){
                        cout << "There was an error getting response from server\r\n";
                      }
@@ -459,8 +460,8 @@ int main()
                       cout << "Could not send get request server! Whoops!\r\n";
                       break;
                     } else {
-                      memset(&filesize, 0, sizeof(&filesize));
-                      int bytesReceived = recv(sock, &filesize, sizeof(&filesize), 0);
+                      //memset(&filesize, 0, sizeof(&filesize));
+                      int bytesReceived = recv(sock, &filesize, sizeof(int), 0);
                       if (bytesReceived == -1){
                         cout << "No such file found; filesize: " << filesize << "\r\n";
                       } else {
@@ -522,7 +523,7 @@ int main()
                             rewind (pFile);
                             long filesize = lSize;
                             cout << "GetFileSize returned: " << filesize <<  "szof:" << sizeof(&filesize)<<"\n";
-                            sendRes = send(sock, &filesize, sizeof(&filesize), 0);
+                            sendRes = send(sock, &filesize, sizeof(int), 0);
 
 
                             // allocate memory to contain the whole file:
