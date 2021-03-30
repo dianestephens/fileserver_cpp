@@ -548,7 +548,7 @@ void * connection_thread(void* p_client_socket) {
           printf("error opening user directory");
         }
       }
-      //show active users
+      // show active users using an active users file
       else if(strcmp(buffer, "show active") == 0){
         printf("show active\n");
         std::ifstream active_users_file("active");
@@ -557,12 +557,16 @@ void * connection_thread(void* p_client_socket) {
 
         if(active_users_file.is_open()){
           while(getline(active_users_file, line)){
+            // init vars
             char temp[line.length() + 1];
-            strcpy(temp, line.c_str());
             char space[2] = " ";
-            strcat(active_users, temp);
-            strcat(active_users, space);
 
+            // copy line from file to temp variable of size line.length()
+            strncpy(temp, line.c_str(), line.length());
+
+            // append text of length line.length() from file to end of active_users string, add space
+            strncat(active_users, temp, line.length());
+            strncat(active_users, space, 2);
           }
           active_users_file.close();
         }
